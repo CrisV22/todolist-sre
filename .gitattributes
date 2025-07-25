@@ -1,3 +1,1 @@
-# força o Git a usar line endings LF sempre, independente do sistema operacional local
-# /frontend/runner.sh text eol=lf
 * text=auto eol=lf

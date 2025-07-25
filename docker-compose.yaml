@@ -60,8 +60,6 @@ services:
 
   k6:
     build: .
-    # networks:
-    #   - k6
     ports:
       - "6565:6565"
     environment:
