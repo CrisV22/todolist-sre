@@ -1,0 +1,80 @@
+services:
+  influxdb3-core:
+    container_name: influxdb3-core
+    image: influxdb:3-core
+    ports:
+      - 8181:8181
+    command:
+      - influxdb3
+      - serve
+      - --node-id=${INFLUXDB_NODE_ID}
+      - --object-store=file
+      - --data-dir=/var/lib/influxdb3
+    volumes:
+      - influxdb_data:/var/lib/influxdb3
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f -H 'Authorization: Bearer ${INFLUXDB_TOKEN}' http://localhost:8181/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  telegraf:
+    container_name: telegraf
+    image: telegraf
+    depends_on:
+      influxdb3-core:
+        condition: service_healthy
+    # Optionally, you can switch to depend on influxdb3-enterprise if using that
+    environment:
+      - INFLUXDB_HOST=${INFLUXDB_HOST}
+      - INFLUXDB_TOKEN=${INFLUXDB_TOKEN}
+      - INFLUXDB_ORG=${INFLUXDB_ORG}
+      - INFLUXDB_BUCKET=${INFLUXDB_BUCKET}
+      - TELEGRAF_COLLECTION_INTERVAL=${TELEGRAF_COLLECTION_INTERVAL}
+      - HOSTNAME=telegraf
+    volumes:
+      - ./telegraf/telegraf.conf:/etc/telegraf/telegraf.conf
+    restart: unless-stopped
+    
+  grafana:
+    image: grafana/grafana
+    ports:
+      - "${GRAFANA_PORT}:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+      - GF_SMTP_ENABLED=${GRAFANA_SMTP_ENABLED}
+      - GF_SMTP_HOST=${GRAFANA_SMTP_HOST}
+      - GF_SMTP_USER=${GRAFANA_SMTP_USER}
+      - GF_SMTP_PASSWORD=${GRAFANA_SMTP_PASSWORD}
+      - GF_SMTP_SKIP_VERIFY=${GRAFANA_SMTP_SKIP_VERIFY}
+      - GF_SMTP_FROM_ADDRESS=${GRAFANA_SMTP_FROM_ADDRESS}
+      - GF_SMTP_FROM_NAME=${GRAFANA_SMTP_FROM_NAME}
+    depends_on:
+      - influxdb3-core
+    # Or switch to influxdb3-enterprise as needed
+    restart: unless-stopped
+
+  k6:
+    build: .
+    # networks:
+    #   - k6
+    ports:
+      - "6565:6565"
+    environment:
+      - K6_OUT=xk6-influxdb=http://influxdb3-core:8181
+      - K6_INFLUXDB_ORGANIZATION=${INFLUXDB_ORG}
+      - K6_INFLUXDB_BUCKET=${INFLUXDB_BUCKET}
+      - K6_INFLUXDB_INSECURE=true
+        # NOTE: This is an Admin token, it's not suggested to use this configuration in production.
+        # Instead, use a Token with restricted privileges.
+      - K6_INFLUXDB_TOKEN=${INFLUXDB_TOKEN}
+    volumes:
+      - ./samples:/scripts
+
+volumes:
+  influxdb_data:
+  grafana_data:
