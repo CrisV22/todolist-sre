@@ -1,4 +1,4 @@
-# PREVIEW 🚀
+# PREVIEW 🎬
 ![Monitoring/Alerting](./docs/preview.gif)
 
 ## References 📚
